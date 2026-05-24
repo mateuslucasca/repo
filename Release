@@ -1,25 +1,8 @@
-Date: Sun, 24 May 2026 01:09:33 +0000
-MD5Sum:
- 24fbe72d4e3ead801bc9fbd3cd6ae5ca              451 Packages
- c38f6d507d0b9fbc021f863882be20b0              361 Packages.bz2
- c5af1157c52f27153904f4ada8e09f71              333 Packages.gz
- 7f37f1dcd96206d7edd6f1dfd459fe11              408 Packages.xz
- 5190fd2521e67750acfbb3870ad2c09b               38 Release
-SHA1:
- f7a9dce06926bc877065cefdc3d854efa49eb5d6              451 Packages
- 9f2b5a937b5318246411a1ce08186db318a7200c              361 Packages.bz2
- aa68bdeaa292eb45d19431b6ffb3ebd8313b65c1              333 Packages.gz
- f6fb2d1dc1f0fbbc20a7d70914d2c2c86875484d              408 Packages.xz
- c94201e55aacfd24609d430ce7c03f153c22b1d9               38 Release
-SHA256:
- b57063cf3849a2b4cee033928c6b41b9684ea0ee80fb2d9f3b93be2b9005b450              451 Packages
- 0ea7ce2de2dd69b983bb02f65ae3956cffeb2e7c20b84c7b1881bf27544f758c              361 Packages.bz2
- 2d27534686a8c13082f9e2cad9c5a4a6cfede3f1b1f52176809091ae31902bea              333 Packages.gz
- c1235db2dea0f2d1a7e3471361b10371ac4647431ed6ed0840d252ec16e11019              408 Packages.xz
- c0f85fb37aacd84d5cb53e57c8031c84064a9a9d54fdb51d1c7e653425f05d3e               38 Release
-SHA512:
- 0701bb83651c3950d61846494b374b4ccf01b14d3c0cc07d26713b7c7a3b12719ef8dd69f52358ee619d43ef1488155a94252d640fdbc7ddb7060e907adbcb76              451 Packages
- 9e033d2c76ad9a125288767dbab30463fd69c1eb37d79c9620b65f8df5e4cfa97f4f7a9342386ad3bb2e070c13aea60970970694149cd8760c7293b1fd9c817f              361 Packages.bz2
- 4865a7ede7f9d2710958119cea9bbf227bc74c6060781e5656cf03228a127c9cda6464a5e44c4ec2d35d619330adc6fdf343b4d3c79b378ff408bfa8d85a33bd              333 Packages.gz
- 23a40173a31b112f9bd727321b93f7bf180d1833eb62132fdaf71490c7e71b45a8c0ff9838e2ae038adfedcfc5ce8e8c565a95538f69f8737a8dcedb4f3faf07              408 Packages.xz
- 3f093aa816ff734d200bb9da6d57cdbd5b4b580e68057e803b753b8f0f6c15cf8a61775b4f6a0d6f977f0682e77fedcacaa81c690cbd4a9540bec5e7b037d66d               38 Release
+Origin: N96j
+Label: N96j
+Suite: stable
+Version: 1.0
+Codename: ios
+Architectures: iphoneos-arm64 arm64 arm64e
+Components: main
+Description: N96j's Repo
