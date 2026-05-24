@@ -1,14 +1,14 @@
 Package: com.n96j.testtweak
-Version: 1.0-3+debug
+Version: 1.0-1+debug
 Architecture: iphoneos-arm64
 Maintainer: N96j
-Installed-Size: 212
+Installed-Size: 128
 Depends: mobilesubstrate
-Filename: debs/com.n96j.testtweak_1.0-3+debug_iphoneos-arm64.deb
-Size: 4428
-MD5sum: 95c7025dcb0aa4a609a22ca246051109
-SHA1: f7df0a4ec520ec3783dba7b313852d9c03ce9304
-SHA256: e58476fcd647974639898274b4fdeb58247670b93d4a9d097c506e01af4d5855
+Filename: debs/com.n96j.testtweak_1.0-1+debug_iphoneos-arm64.deb
+Size: 3724
+MD5sum: d46e4eb1d1d0c2515f3ad74728aad2d3
+SHA1: 1895b1983d569bda72917eebec2f1e013764f3cc
+SHA256: 285f53fec3cbebea6be804ea3c6cdd9b59700ab8c6f85b8fed3be40f02960cdc
 Section: Tweaks
 Description: Tweak for Test
 Author: N96j
