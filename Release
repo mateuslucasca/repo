@@ -1,8 +1,25 @@
-Origin: N96j
-Label: N96j
-Suite: stable
-Version: 1.0
-Codename: ios
-Architecture: iphoneos-arm64
-Components: main
-Description: N96j's Repo
+Date: Sun, 24 May 2026 00:57:29 +0000
+MD5Sum:
+ 64b9f2564f5bcd21967a71087e25f879             1720 Packages
+ e38f0b90db9ec8ba4656805b83dedbe3              492 Packages.bz2
+ 262a4430276e9b2042261a6f8eaadbb0              743 Packages.gz
+ 25c82c6adf8b32cd424e80c4feb1f4cf              808 Packages.xz
+ d0a192bd1d5f4b0bf30937c0469493ce               38 Release
+SHA1:
+ 37c1eb32599a53f090f4ef099ebf7dd55a4bf270             1720 Packages
+ f7191698478059fa783dbc1a8d8de50b48e9f6d0              492 Packages.bz2
+ 800ae18a740e124ed61e9e6646e3503252927311              743 Packages.gz
+ 412eeb9a3e3a8925c9cbbfac9d56007fc6badbe3              808 Packages.xz
+ 45eb586c66042ca0d78612a5bc9b1f869b1c8298               38 Release
+SHA256:
+ 8d8b3955b7cb0f48b445af4d6cad698b1e12b35699e38cc2102233331c1e71da             1720 Packages
+ 9d9e9330b329e9e15f1463bb4a8ed4208982601a125a699317e22c07380d7558              492 Packages.bz2
+ 8d6fb9dc45c8a12f0b859220f64c8bf9a3a2096c5e3d8bca5e97ed7793825abb              743 Packages.gz
+ 225109fcf648ac6553c8f3d4a51eb052222570efd0f6a39c6751c5d8c8edd975              808 Packages.xz
+ e733d787c9c826c4b96d5cf79340266a74f3e7163ca4be0d2e7d22b04999862d               38 Release
+SHA512:
+ 497a838da19d4cf2e56e103525471a46dc0f0894962f88c937fd387070e467ed17cba32c4a63c9d7709ab48fbd2270f4e322dacc63b31c0570dc7ba43d036142             1720 Packages
+ 15d89ed00647a3370c5c9ad4e6a1b04a24d5bc9c3cc1f1a3045b5103eec9cbebe022647330dd1d97056baf6a06b2aa5938dccf4bfbcc710518c947ebbf8e11f0              492 Packages.bz2
+ 130cb5592dda57de1a4f8fc68f2dd9922a4e9177989570d3bdd624275a6eb03e82e77d7cf39a7511dd9a7f9a53d1c066a206f13976aa88cecae2780f64e08d59              743 Packages.gz
+ 690905296f46e2f593721c087f93f69400bd34d0a3cfb4ea3a29f0dfa48d435ff4ccb200cea27eb5431df2c814614c9fd964921eab57bb912e25cd27744631d8              808 Packages.xz
+ a074ea8d2779170d13e4529043302d0d02376de932275285241b45153b0f325af9487575e9b37466fdd478d28ea187e6019c250a98ad95befd3e38b44cdbb247               38 Release
