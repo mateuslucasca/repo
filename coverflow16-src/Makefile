@@ -6,7 +6,7 @@ INSTALL_TARGET_PROCESSES = Music
 include $(THEOS)/makefiles/common.mk
 
 TWEAK_NAME = CoverFlow16
-CoverFlow16_FILES = Tweak.m Hotfix.m
+CoverFlow16_FILES = Tweak.m Hotfix.m NowPlaying.m
 CoverFlow16_FRAMEWORKS = UIKit MediaPlayer QuartzCore
 CoverFlow16_CFLAGS = -fobjc-arc -Wall -Wextra -Wno-error=deprecated-declarations
 
