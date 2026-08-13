@@ -63,7 +63,7 @@
 }
 @end
 
-@interface CF16Manager : NSObject <UICollectionViewDataSource, UICollectionViewDelegate, UIScrollViewDelegate>
+@interface CF16Manager : NSObject <UICollectionViewDataSource,UICollectionViewDelegate,UIScrollViewDelegate,UITableViewDataSource,UITableViewDelegate>
 @property(nonatomic,strong) UIView *overlay;
 @property(nonatomic,strong) UIView *canvas;
 @property(nonatomic,strong) UICollectionView *collection;
@@ -71,16 +71,27 @@
 @property(nonatomic,strong) UILabel *albumLabel;
 @property(nonatomic,strong) UILabel *artistLabel;
 @property(nonatomic,strong) UILabel *emptyLabel;
+@property(nonatomic,strong) UIView *trackPanel;
+@property(nonatomic,strong) UIButton *backButton;
+@property(nonatomic,strong) UIImageView *trackArtwork;
+@property(nonatomic,strong) UILabel *trackAlbumLabel;
+@property(nonatomic,strong) UILabel *trackArtistLabel;
+@property(nonatomic,strong) UILabel *trackMetaLabel;
+@property(nonatomic,strong) UITableView *trackTable;
+@property(nonatomic,strong) NSArray<MPMediaItem *> *tracks;
+@property(nonatomic,assign) NSInteger openedAlbumIndex;
 @property(nonatomic,strong) NSArray<MPMediaItemCollection *> *albums;
 @property(nonatomic,strong) NSCache<NSNumber *, UIImage *> *artCache;
 @property(nonatomic,strong) NSOperationQueue *artQueue;
 @property(nonatomic,strong) UIImage *placeholder;
+@property(nonatomic,strong) MPMusicPlayerController *player;
 @property(nonatomic,assign) CGFloat coverSize;
 @property(nonatomic,assign) CGFloat stride;
 @property(nonatomic,assign) CGFloat reflectionHeight;
 @property(nonatomic,assign) NSInteger selected;
 @property(nonatomic,assign) BOOL dismissed;
 @property(nonatomic,assign) BOOL libraryLoaded;
+@property(nonatomic,assign) BOOL showingTracks;
 @property(nonatomic,assign) UIDeviceOrientation displayedOrientation;
 + (instancetype)shared;
 - (void)start;
@@ -93,26 +104,28 @@
     dispatch_once(&once, ^{
         m=[CF16Manager new];
         m.selected=0;
+        m.openedAlbumIndex=NSNotFound;
         m.displayedOrientation=UIDeviceOrientationUnknown;
         m.artCache=[NSCache new];
         m.artCache.countLimit=48;
         m.artQueue=[NSOperationQueue new];
         m.artQueue.maxConcurrentOperationCount=1;
         m.artQueue.qualityOfService=NSQualityOfServiceUserInitiated;
+        m.player=[MPMusicPlayerController systemMusicPlayer];
     });
     return m;
 }
-
 - (void)log:(NSString *)s { NSLog(@"[CoverFlow16] %@",s); }
-
 - (void)start {
     [self log:@"loaded into Music"];
     [UIDevice.currentDevice beginGeneratingDeviceOrientationNotifications];
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(rotated:) name:UIDeviceOrientationDidChangeNotification object:nil];
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(appActive:) name:UIApplicationDidBecomeActiveNotification object:nil];
+    [self.player beginGeneratingPlaybackNotifications];
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(nowPlayingChanged:) name:MPMusicPlayerControllerNowPlayingItemDidChangeNotification object:self.player];
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(nowPlayingChanged:) name:MPMusicPlayerControllerPlaybackStateDidChangeNotification object:self.player];
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW,(int64_t)(0.12*NSEC_PER_SEC)),dispatch_get_main_queue(),^{ [self rotated:nil]; });
 }
-
 - (UIWindow *)keyWindow {
     UIWindow *fallback=nil;
     for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
@@ -125,9 +138,8 @@
     }
     return fallback;
 }
-
 - (void)appActive:(NSNotification *)n { (void)n; [self rotated:nil]; }
-
+- (void)nowPlayingChanged:(NSNotification *)n { (void)n; if (self.showingTracks) [self.trackTable reloadData]; }
 - (void)rotated:(NSNotification *)n {
     (void)n;
     UIDeviceOrientation o=UIDevice.currentDevice.orientation;
@@ -140,15 +152,11 @@
         [self hide:YES];
     }
 }
-
 - (void)show:(UIDeviceOrientation)o {
     UIWindow *w=[self keyWindow];
     if (!w) return;
     if (!self.overlay) [self build:w];
-    if (self.overlay.superview!=w) {
-        [self.overlay removeFromSuperview];
-        [w addSubview:self.overlay];
-    }
+    if (self.overlay.superview!=w) { [self.overlay removeFromSuperview]; [w addSubview:self.overlay]; }
     if (self.displayedOrientation!=o || self.overlay.hidden) {
         self.displayedOrientation=o;
         [self layoutForWindow:w orientation:o];
@@ -156,7 +164,6 @@
     self.overlay.hidden=NO;
     self.overlay.alpha=1;
     [w bringSubviewToFront:self.overlay];
-
     if (!self.libraryLoaded) {
         self.libraryLoaded=YES;
         self.emptyLabel.hidden=NO;
@@ -164,17 +171,14 @@
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW,(int64_t)(0.01*NSEC_PER_SEC)),dispatch_get_main_queue(),^{ [self reloadAlbums]; });
     }
 }
-
 - (void)build:(UIWindow *)w {
     self.overlay=[[UIView alloc] initWithFrame:w.bounds];
     self.overlay.backgroundColor=UIColor.blackColor;
     self.overlay.clipsToBounds=YES;
-
     self.canvas=[UIView new];
     self.canvas.backgroundColor=UIColor.blackColor;
     self.canvas.clipsToBounds=YES;
     [self.overlay addSubview:self.canvas];
-
     UILabel *title=[UILabel new];
     title.tag=1601;
     title.text=@"Cover Flow";
@@ -183,7 +187,6 @@
     title.font=[UIFont systemFontOfSize:13 weight:UIFontWeightSemibold];
     title.textAlignment=NSTextAlignmentCenter;
     [self.canvas addSubview:title];
-
     UIButton *close=[UIButton buttonWithType:UIButtonTypeSystem];
     close.tag=1602;
     [close setTitle:@"×" forState:UIControlStateNormal];
@@ -191,12 +194,10 @@
     [close setTitleColor:[UIColor colorWithWhite:1 alpha:.78] forState:UIControlStateNormal];
     [close addTarget:self action:@selector(close:) forControlEvents:UIControlEventTouchUpInside];
     [self.canvas addSubview:close];
-
     self.flow=[UICollectionViewFlowLayout new];
     self.flow.scrollDirection=UICollectionViewScrollDirectionHorizontal;
     self.flow.minimumLineSpacing=0;
     self.flow.minimumInteritemSpacing=0;
-
     self.collection=[[UICollectionView alloc] initWithFrame:CGRectZero collectionViewLayout:self.flow];
     self.collection.backgroundColor=UIColor.clearColor;
     self.collection.showsHorizontalScrollIndicator=NO;
@@ -207,49 +208,82 @@
     self.collection.delegate=self;
     [self.collection registerClass:CF16Cell.class forCellWithReuseIdentifier:@"CF16Cell"];
     [self.canvas addSubview:self.collection];
-
     self.albumLabel=[UILabel new];
     self.albumLabel.textColor=UIColor.whiteColor;
     self.albumLabel.font=[UIFont systemFontOfSize:17 weight:UIFontWeightSemibold];
     self.albumLabel.textAlignment=NSTextAlignmentCenter;
     [self.canvas addSubview:self.albumLabel];
-
     self.artistLabel=[UILabel new];
     self.artistLabel.textColor=[UIColor colorWithWhite:1 alpha:.62];
     self.artistLabel.font=[UIFont systemFontOfSize:13];
     self.artistLabel.textAlignment=NSTextAlignmentCenter;
     [self.canvas addSubview:self.artistLabel];
-
     self.emptyLabel=[UILabel new];
     self.emptyLabel.textColor=[UIColor colorWithWhite:1 alpha:.65];
     self.emptyLabel.textAlignment=NSTextAlignmentCenter;
     self.emptyLabel.numberOfLines=2;
     self.emptyLabel.hidden=YES;
     [self.canvas addSubview:self.emptyLabel];
-
+    [self buildTrackPanel];
     [w addSubview:self.overlay];
 }
-
+- (void)buildTrackPanel {
+    self.trackPanel=[UIView new];
+    self.trackPanel.backgroundColor=UIColor.blackColor;
+    self.trackPanel.hidden=YES;
+    [self.canvas addSubview:self.trackPanel];
+    self.backButton=[UIButton buttonWithType:UIButtonTypeSystem];
+    [self.backButton setTitle:@"‹ Albums" forState:UIControlStateNormal];
+    [self.backButton setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
+    self.backButton.titleLabel.font=[UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
+    self.backButton.contentHorizontalAlignment=UIControlContentHorizontalAlignmentLeft;
+    [self.backButton addTarget:self action:@selector(backToAlbums:) forControlEvents:UIControlEventTouchUpInside];
+    [self.trackPanel addSubview:self.backButton];
+    self.trackArtwork=[UIImageView new];
+    self.trackArtwork.contentMode=UIViewContentModeScaleAspectFill;
+    self.trackArtwork.clipsToBounds=YES;
+    self.trackArtwork.layer.cornerRadius=5;
+    self.trackArtwork.layer.borderWidth=.5;
+    self.trackArtwork.layer.borderColor=[UIColor colorWithWhite:1 alpha:.14].CGColor;
+    [self.trackPanel addSubview:self.trackArtwork];
+    self.trackAlbumLabel=[UILabel new];
+    self.trackAlbumLabel.textColor=UIColor.whiteColor;
+    self.trackAlbumLabel.font=[UIFont systemFontOfSize:18 weight:UIFontWeightBold];
+    self.trackAlbumLabel.numberOfLines=2;
+    [self.trackPanel addSubview:self.trackAlbumLabel];
+    self.trackArtistLabel=[UILabel new];
+    self.trackArtistLabel.textColor=[UIColor colorWithWhite:1 alpha:.62];
+    self.trackArtistLabel.font=[UIFont systemFontOfSize:14 weight:UIFontWeightRegular];
+    self.trackArtistLabel.numberOfLines=2;
+    [self.trackPanel addSubview:self.trackArtistLabel];
+    self.trackMetaLabel=[UILabel new];
+    self.trackMetaLabel.textColor=[UIColor colorWithWhite:1 alpha:.45];
+    self.trackMetaLabel.font=[UIFont systemFontOfSize:12];
+    self.trackMetaLabel.numberOfLines=2;
+    [self.trackPanel addSubview:self.trackMetaLabel];
+    self.trackTable=[[UITableView alloc] initWithFrame:CGRectZero style:UITableViewStylePlain];
+    self.trackTable.backgroundColor=UIColor.blackColor;
+    self.trackTable.separatorColor=[UIColor colorWithWhite:1 alpha:.10];
+    self.trackTable.indicatorStyle=UIScrollViewIndicatorStyleWhite;
+    self.trackTable.rowHeight=52;
+    self.trackTable.dataSource=self;
+    self.trackTable.delegate=self;
+    self.trackTable.tableFooterView=[UIView new];
+    [self.trackPanel addSubview:self.trackTable];
+}
 - (void)layoutForWindow:(UIWindow *)w orientation:(UIDeviceOrientation)o {
     self.overlay.frame=w.bounds;
     CGFloat pw=MAX(CGRectGetWidth(w.bounds),CGRectGetHeight(w.bounds));
     CGFloat ph=MIN(CGRectGetWidth(w.bounds),CGRectGetHeight(w.bounds));
     self.canvas.bounds=CGRectMake(0,0,pw,ph);
     self.canvas.center=CGPointMake(CGRectGetMidX(self.overlay.bounds),CGRectGetMidY(self.overlay.bounds));
-
-    if (CGRectGetWidth(w.bounds)>CGRectGetHeight(w.bounds)) {
-        self.canvas.transform=CGAffineTransformIdentity;
-    } else {
-        self.canvas.transform=CGAffineTransformMakeRotation(o==UIDeviceOrientationLandscapeLeft ? M_PI_2 : -M_PI_2);
-    }
-
+    if (CGRectGetWidth(w.bounds)>CGRectGetHeight(w.bounds)) self.canvas.transform=CGAffineTransformIdentity;
+    else self.canvas.transform=CGAffineTransformMakeRotation(o==UIDeviceOrientationLandscapeLeft ? M_PI_2 : -M_PI_2);
     [self.canvas viewWithTag:1601].frame=CGRectMake((pw-180)/2,7,180,24);
     [self.canvas viewWithTag:1602].frame=CGRectMake(pw-52,1,48,42);
-
     self.coverSize=MIN(206,MAX(128,floor(ph*.51)));
     self.stride=MAX(90,floor(self.coverSize*.60));
     self.reflectionHeight=floor(self.coverSize*.23);
-
     CGFloat collectionY=35;
     CGFloat collectionH=MAX(170,ph-89);
     self.collection.frame=CGRectMake(0,collectionY,pw,collectionH);
@@ -257,12 +291,21 @@
     CGFloat sideInset=MAX(0,(pw-self.stride)/2.0);
     self.flow.sectionInset=UIEdgeInsetsMake(MAX(0,floor((collectionH-self.coverSize-self.reflectionHeight)*.35)),sideInset,0,sideInset);
     [self.flow invalidateLayout];
-
     self.albumLabel.frame=CGRectMake(48,ph-50,pw-96,23);
     self.artistLabel.frame=CGRectMake(48,ph-28,pw-96,18);
     self.emptyLabel.frame=CGRectMake(30,70,pw-60,ph-130);
-
     self.placeholder=[self makePlaceholder:CGSizeMake(self.coverSize,self.coverSize)];
+    self.trackPanel.frame=CGRectMake(0,0,pw,ph);
+    self.backButton.frame=CGRectMake(16,4,110,38);
+    CGFloat leftW=MAX(175,MIN(225,pw*.32));
+    CGFloat artSize=MIN(leftW-32,ph-98);
+    self.trackArtwork.frame=CGRectMake(18,52,artSize,artSize);
+    CGFloat infoY=CGRectGetMaxY(self.trackArtwork.frame)+10;
+    self.trackAlbumLabel.frame=CGRectMake(18,infoY,leftW-34,45);
+    self.trackArtistLabel.frame=CGRectMake(18,infoY+46,leftW-34,37);
+    self.trackMetaLabel.frame=CGRectMake(18,infoY+84,leftW-34,34);
+    CGFloat tableX=leftW;
+    self.trackTable.frame=CGRectMake(tableX,42,pw-tableX,ph-42);
     [self.collection reloadData];
     if (self.albums.count) {
         self.selected=MAX(0,MIN(self.selected,(NSInteger)self.albums.count-1));
@@ -270,8 +313,8 @@
         [self updateLabels:self.selected];
         dispatch_async(dispatch_get_main_queue(),^{ [self updateTransforms]; });
     }
+    if (self.showingTracks && self.openedAlbumIndex!=NSNotFound) [self refreshTrackPanel];
 }
-
 - (void)reloadAlbums {
     @try {
         self.albums=[MPMediaQuery albumsQuery].collections ?: @[];
@@ -288,7 +331,6 @@
     if (self.albums.count) [self updateLabels:0];
     dispatch_async(dispatch_get_main_queue(),^{ [self updateTransforms]; });
 }
-
 - (UIImage *)makePlaceholder:(CGSize)s {
     UIGraphicsBeginImageContextWithOptions(s,YES,0);
     [[UIColor colorWithWhite:.12 alpha:1] setFill];
@@ -300,12 +342,9 @@
     UIGraphicsEndImageContext();
     return r;
 }
-
 - (NSInteger)collectionView:(UICollectionView *)collectionView numberOfItemsInSection:(NSInteger)section {
-    (void)collectionView; (void)section;
-    return self.albums.count;
+    (void)collectionView; (void)section; return self.albums.count;
 }
-
 - (__kindof UICollectionViewCell *)collectionView:(UICollectionView *)collectionView cellForItemAtIndexPath:(NSIndexPath *)indexPath {
     CF16Cell *cell=[collectionView dequeueReusableCellWithReuseIdentifier:@"CF16Cell" forIndexPath:indexPath];
     NSInteger idx=indexPath.item;
@@ -315,15 +354,9 @@
     cell.art.image=self.placeholder;
     cell.reflection.image=self.placeholder;
     [cell setNeedsLayout];
-
     NSNumber *key=@(idx);
     UIImage *cached=[self.artCache objectForKey:key];
-    if (cached) {
-        cell.art.image=cached;
-        cell.reflection.image=cached;
-        return cell;
-    }
-
+    if (cached) { cell.art.image=cached; cell.reflection.image=cached; return cell; }
     if (idx>=0 && idx<(NSInteger)self.albums.count) {
         MPMediaItemCollection *album=self.albums[idx];
         MPMediaItem *item=album.representativeItem ?: album.items.firstObject;
@@ -347,18 +380,19 @@
     }
     return cell;
 }
-
 - (void)collectionView:(UICollectionView *)collectionView didSelectItemAtIndexPath:(NSIndexPath *)indexPath {
     (void)collectionView;
-    [self select:indexPath.item animated:YES];
+    NSInteger idx=indexPath.item;
+    CGFloat expected=idx*self.stride;
+    BOOL centered=(fabs(self.collection.contentOffset.x-expected)<MAX(8,self.stride*.12));
+    if (idx==self.selected && centered) [self openAlbumAtIndex:idx];
+    else [self select:idx animated:YES];
 }
-
 - (NSInteger)nearestIndexForOffset:(CGFloat)x {
     if (!self.albums.count || self.stride<=0) return NSNotFound;
     NSInteger idx=(NSInteger)llround(x/self.stride);
     return MAX(0,MIN(idx,(NSInteger)self.albums.count-1));
 }
-
 - (void)select:(NSInteger)idx animated:(BOOL)animated {
     if (idx<0 || idx>=(NSInteger)self.albums.count) return;
     self.selected=idx;
@@ -366,7 +400,6 @@
     [self.collection setContentOffset:CGPointMake(idx*self.stride,0) animated:animated];
     [self updateTransforms];
 }
-
 - (void)updateLabels:(NSInteger)idx {
     if (idx<0 || idx>=(NSInteger)self.albums.count) return;
     MPMediaItemCollection *c=self.albums[idx];
@@ -377,25 +410,18 @@
     self.albumLabel.text=album.length?album:@"Unknown Album";
     self.artistLabel.text=artist.length?artist:@"Unknown Artist";
 }
-
 - (void)updateTransforms {
-    if (!self.collection || self.stride<=0) return;
+    if (!self.collection || self.stride<=0 || self.showingTracks) return;
     CGFloat viewportCenter=self.collection.contentOffset.x+CGRectGetWidth(self.collection.bounds)/2.0;
     NSInteger near=[self nearestIndexForOffset:self.collection.contentOffset.x];
-    if (near!=NSNotFound && near!=self.selected) {
-        self.selected=near;
-        [self updateLabels:near];
-    }
-
+    if (near!=NSNotFound && near!=self.selected) { self.selected=near; [self updateLabels:near]; }
     for (CF16Cell *cell in self.collection.visibleCells) {
         CGFloat n=(cell.center.x-viewportCenter)/self.stride;
         CGFloat distance=MIN(2.3,fabs(n));
         CATransform3D t=CATransform3DIdentity;
         t.m34=-1.0/700.0;
-        if (fabs(n)<.14) {
-            cell.layer.zPosition=1000;
-            cell.alpha=1;
-        } else {
+        if (fabs(n)<.14) { cell.layer.zPosition=1000; cell.alpha=1; }
+        else {
             CGFloat side=n<0?-1:1;
             CGFloat scale=MAX(.79,.90-distance*.035);
             t=CATransform3DTranslate(t,side*-self.coverSize*.08,0,-MIN(145,distance*50));
@@ -407,41 +433,163 @@
         cell.layer.transform=t;
     }
 }
-
-- (void)scrollViewDidScroll:(UIScrollView *)scrollView {
-    (void)scrollView;
-    [self updateTransforms];
+- (void)openAlbumAtIndex:(NSInteger)idx {
+    if (idx<0 || idx>=(NSInteger)self.albums.count) return;
+    MPMediaItemCollection *album=self.albums[idx];
+    NSArray<MPMediaItem *> *items=album.items ?: @[];
+    if (!items.count) return;
+    self.openedAlbumIndex=idx;
+    self.tracks=items;
+    self.showingTracks=YES;
+    [self refreshTrackPanel];
+    self.trackPanel.hidden=NO;
+    self.trackPanel.alpha=0;
+    self.trackPanel.transform=CGAffineTransformMakeTranslation(28,0);
+    [self.canvas bringSubviewToFront:self.trackPanel];
+    [self.canvas bringSubviewToFront:[self.canvas viewWithTag:1602]];
+    [UIView animateWithDuration:.16 animations:^{ self.trackPanel.alpha=1; self.trackPanel.transform=CGAffineTransformIdentity; }];
+    [self.trackTable reloadData];
 }
-
+- (void)refreshTrackPanel {
+    if (self.openedAlbumIndex<0 || self.openedAlbumIndex>=(NSInteger)self.albums.count) return;
+    MPMediaItemCollection *album=self.albums[self.openedAlbumIndex];
+    MPMediaItem *rep=album.representativeItem ?: album.items.firstObject;
+    NSString *albumName=[rep valueForProperty:MPMediaItemPropertyAlbumTitle];
+    NSString *artist=[rep valueForProperty:MPMediaItemPropertyAlbumArtist];
+    if (!artist.length) artist=[rep valueForProperty:MPMediaItemPropertyArtist];
+    self.trackAlbumLabel.text=albumName.length?albumName:@"Unknown Album";
+    self.trackArtistLabel.text=artist.length?artist:@"Unknown Artist";
+    NSTimeInterval total=0;
+    for (MPMediaItem *item in self.tracks) total += [[item valueForProperty:MPMediaItemPropertyPlaybackDuration] doubleValue];
+    NSInteger minutes=(NSInteger)llround(total/60.0);
+    self.trackMetaLabel.text=[NSString stringWithFormat:@"%lu tracks • %ld min",(unsigned long)self.tracks.count,(long)minutes];
+    UIImage *cached=[self.artCache objectForKey:@(self.openedAlbumIndex)];
+    self.trackArtwork.image=cached ?: self.placeholder;
+    if (!cached) {
+        MPMediaItemArtwork *art=[rep valueForProperty:MPMediaItemPropertyArtwork];
+        CGSize request=CGSizeMake(420,420);
+        NSInteger represented=self.openedAlbumIndex;
+        __weak typeof(self) weakSelf=self;
+        [self.artQueue addOperationWithBlock:^{
+            UIImage *image=[art imageWithSize:request];
+            if (!image) return;
+            typeof(self) selfRef=weakSelf;
+            if (!selfRef) return;
+            [selfRef.artCache setObject:image forKey:@(represented)];
+            [[NSOperationQueue mainQueue] addOperationWithBlock:^{
+                if (!selfRef.showingTracks || selfRef.openedAlbumIndex!=represented) return;
+                selfRef.trackArtwork.image=image;
+            }];
+        }];
+    }
+}
+- (void)backToAlbums:(id)sender {
+    (void)sender;
+    if (!self.showingTracks) return;
+    [UIView animateWithDuration:.14 animations:^{ self.trackPanel.alpha=0; self.trackPanel.transform=CGAffineTransformMakeTranslation(28,0); } completion:^(BOOL finished){
+        (void)finished;
+        self.trackPanel.hidden=YES;
+        self.trackPanel.alpha=1;
+        self.trackPanel.transform=CGAffineTransformIdentity;
+        self.showingTracks=NO;
+        self.tracks=nil;
+        self.openedAlbumIndex=NSNotFound;
+        [self updateTransforms];
+    }];
+}
+- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
+    (void)tableView; (void)section; return self.tracks.count;
+}
+- (NSString *)durationStringForItem:(MPMediaItem *)item {
+    NSTimeInterval duration=[[item valueForProperty:MPMediaItemPropertyPlaybackDuration] doubleValue];
+    NSInteger seconds=MAX(0,(NSInteger)llround(duration));
+    return [NSString stringWithFormat:@"%ld:%02ld",(long)(seconds/60),(long)(seconds%60)];
+}
+- (BOOL)itemIsNowPlaying:(MPMediaItem *)item {
+    MPMediaItem *now=self.player.nowPlayingItem;
+    if (!now) return NO;
+    NSNumber *a=[item valueForProperty:MPMediaItemPropertyPersistentID];
+    NSNumber *b=[now valueForProperty:MPMediaItemPropertyPersistentID];
+    return a && b && [a isEqual:b];
+}
+- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
+    static NSString *reuse=@"CF16Track";
+    UITableViewCell *cell=[tableView dequeueReusableCellWithIdentifier:reuse];
+    if (!cell) {
+        cell=[[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:reuse];
+        cell.backgroundColor=UIColor.blackColor;
+        cell.textLabel.textColor=UIColor.whiteColor;
+        cell.textLabel.font=[UIFont systemFontOfSize:15 weight:UIFontWeightMedium];
+        cell.detailTextLabel.textColor=[UIColor colorWithWhite:1 alpha:.48];
+        cell.detailTextLabel.font=[UIFont systemFontOfSize:11];
+        cell.tintColor=UIColor.whiteColor;
+        UIView *selected=[UIView new];
+        selected.backgroundColor=[UIColor colorWithWhite:1 alpha:.10];
+        cell.selectedBackgroundView=selected;
+    }
+    if (indexPath.row<0 || indexPath.row>=(NSInteger)self.tracks.count) return cell;
+    MPMediaItem *item=self.tracks[indexPath.row];
+    NSString *title=[item valueForProperty:MPMediaItemPropertyTitle];
+    NSNumber *trackNumber=[item valueForProperty:MPMediaItemPropertyAlbumTrackNumber];
+    NSInteger number=trackNumber.integerValue;
+    if (number<=0) number=indexPath.row+1;
+    cell.textLabel.text=[NSString stringWithFormat:@"%ld. %@",(long)number,title.length?title:@"Unknown Track"];
+    NSString *artist=[item valueForProperty:MPMediaItemPropertyArtist];
+    NSString *duration=[self durationStringForItem:item];
+    cell.detailTextLabel.text=artist.length ? [NSString stringWithFormat:@"%@  •  %@",artist,duration] : duration;
+    cell.accessoryType=[self itemIsNowPlaying:item] ? UITableViewCellAccessoryCheckmark : UITableViewCellAccessoryNone;
+    return cell;
+}
+- (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
+    [tableView deselectRowAtIndexPath:indexPath animated:YES];
+    if (indexPath.row<0 || indexPath.row>=(NSInteger)self.tracks.count) return;
+    if (self.openedAlbumIndex<0 || self.openedAlbumIndex>=(NSInteger)self.albums.count) return;
+    MPMediaItemCollection *album=self.albums[self.openedAlbumIndex];
+    MPMediaItem *item=self.tracks[indexPath.row];
+    @try {
+        [self.player pause];
+        [self.player setQueueWithItemCollection:album];
+        self.player.nowPlayingItem=item;
+        [self.player prepareToPlay];
+        [self.player play];
+        [self log:[NSString stringWithFormat:@"play track %ld from album %ld",(long)indexPath.row,(long)self.openedAlbumIndex]];
+    } @catch (NSException *e) {
+        [self log:[NSString stringWithFormat:@"playback failed: %@",e.reason]];
+    }
+    [self.trackTable reloadData];
+}
+- (void)scrollViewDidScroll:(UIScrollView *)scrollView {
+    if (scrollView==self.collection) [self updateTransforms];
+}
 - (void)scrollViewWillEndDragging:(UIScrollView *)scrollView withVelocity:(CGPoint)velocity targetContentOffset:(inout CGPoint *)targetContentOffset {
-    (void)scrollView; (void)velocity;
+    if (scrollView!=self.collection) return;
+    (void)velocity;
     NSInteger idx=[self nearestIndexForOffset:targetContentOffset->x];
     if (idx!=NSNotFound) targetContentOffset->x=idx*self.stride;
 }
-
 - (void)scrollViewDidEndDecelerating:(UIScrollView *)scrollView {
+    if (scrollView!=self.collection) return;
     NSInteger idx=[self nearestIndexForOffset:scrollView.contentOffset.x];
     if (idx!=NSNotFound) [self select:idx animated:NO];
 }
-
 - (void)scrollViewDidEndScrollingAnimation:(UIScrollView *)scrollView {
+    if (scrollView!=self.collection) return;
     NSInteger idx=[self nearestIndexForOffset:scrollView.contentOffset.x];
     if (idx!=NSNotFound) [self select:idx animated:NO];
 }
-
-- (void)close:(id)sender {
-    (void)sender;
-    self.dismissed=YES;
-    [self hide:YES];
-}
-
+- (void)close:(id)sender { (void)sender; self.dismissed=YES; [self hide:YES]; }
 - (void)hide:(BOOL)animated {
     if (!self.overlay || self.overlay.hidden) return;
     [self.artQueue cancelAllOperations];
-    if (!animated) {
-        self.overlay.hidden=YES;
-        return;
+    if (self.showingTracks) {
+        self.trackPanel.hidden=YES;
+        self.trackPanel.alpha=1;
+        self.trackPanel.transform=CGAffineTransformIdentity;
+        self.showingTracks=NO;
+        self.tracks=nil;
+        self.openedAlbumIndex=NSNotFound;
     }
+    if (!animated) { self.overlay.hidden=YES; return; }
     [UIView animateWithDuration:.10 animations:^{ self.overlay.alpha=0; } completion:^(BOOL finished){
         (void)finished;
         self.overlay.hidden=YES;
