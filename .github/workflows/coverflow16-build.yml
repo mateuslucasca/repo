@@ -16,6 +16,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install build prerequisites
+        run: |
+          brew install ldid
+
       - name: Install Theos
         run: |
           git clone --recursive --depth=1 https://github.com/theos/theos.git "$HOME/theos"
@@ -25,7 +29,6 @@ jobs:
         run: |
           export THEOS="$HOME/theos"
           make -C coverflow16-src clean package FINALPACKAGE=1
-          file coverflow16-src/.theos/obj/debug/CoverFlow16.dylib || true
           find coverflow16-src/packages -maxdepth 1 -type f -name '*.deb' -print
 
       - name: Upload deb
