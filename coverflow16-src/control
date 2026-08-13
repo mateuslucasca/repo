@@ -1,8 +1,8 @@
 Package: com.mateus.coverflow16
 Name: CoverFlow 16
-Version: 0.1.2
+Version: 0.2.0
 Architecture: iphoneos-arm64
-Description: Classic Cover Flow-style album browser for the Music app on rootless iOS 16.
+Description: Classic Cover Flow-style album browser with album tracklists and playback for the Music app on rootless iOS 16.
 Maintainer: Mateus
 Author: Mateus
 Section: Tweaks
