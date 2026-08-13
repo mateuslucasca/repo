@@ -1,8 +1,8 @@
 Package: com.mateus.coverflow16
 Name: CoverFlow 16
-Version: 0.2.1
+Version: 0.3.0
 Architecture: iphoneos-arm64
-Description: Classic Cover Flow-style album browser with stable album tracklists for the Music app on rootless iOS 16. Playback is temporarily disabled in this hotfix while isolating a Music.app crash.
+Description: Classic Cover Flow-style album browser for the Music app on rootless iOS 16, with stable album tracklists and a MediaRemote Now Playing control strip.
 Maintainer: Mateus
 Author: Mateus
 Section: Tweaks
