@@ -1,9 +1,12 @@
 #import <UIKit/UIKit.h>
 #import <WebKit/WebKit.h>
-// Keep every custom UIKit class name present in MainWindow.nib so later passes
-// can load portions of the original archive without class-substitution hacks.
+// Keep the legacy custom UIKit class names that do not collide with symbols
+// introduced by modern UIKit. UIMenuView is intentionally omitted here:
+// iOS 13+ exports a UIMenuIdentifier constant with that exact C symbol name.
+// The first native port does not unarchive MainWindow.nib, so the class is not
+// needed at runtime; if the old NIB path is restored later, create it through
+// the Objective-C runtime instead of a compile-time @interface.
 @interface UICustomSwitch:UISwitch@end @implementation UICustomSwitch@end
-@interface UIMenuView:UIView@end @implementation UIMenuView@end
 @interface UIMusicList:UIView@end @implementation UIMusicList@end
 @interface UISettingView:UIView@end @implementation UISettingView@end
 @interface UIMelodyListView:UIView@end @implementation UIMelodyListView@end
