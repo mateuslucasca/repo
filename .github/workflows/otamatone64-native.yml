@@ -33,6 +33,7 @@ jobs:
             otamatone64/src/*.m otamatone64/src/*.c \
             -framework Foundation \
             -framework UIKit \
+            -framework CoreGraphics \
             -framework AVFoundation \
             -framework CoreMotion \
             -framework WebKit \
