@@ -1,0 +1,12 @@
+#import <Foundation/Foundation.h>
+#import "OtamaAudio.h"
+#import "OtamaReplay.h"
+@class EAGLView;
+typedef NS_ENUM(NSInteger,OtamaMainModeID){OtamaModeTitle=0,OtamaModeGame,OtamaModeMenu,OtamaModeTutorial,OtamaModeSetting,OtamaModeFileList,OtamaModeReplay,OtamaModeMelody,OtamaModeDebug};
+@interface MainMode:NSObject
+@property(nonatomic,weak)EAGLView*view;@property(nonatomic,strong,readonly)OtamaAudio*audio;@property(nonatomic)OtamaMainModeID mode;@property(nonatomic)float pitch;@property(nonatomic)float mouth;@property(nonatomic)BOOL playing;@property(nonatomic)NSInteger flagFrame;@property(nonatomic)float headAngle;@property(nonatomic)BOOL recording;@property(nonatomic,readonly)BOOL replaying;@property(nonatomic,readonly)NSInteger replayFrame;@property(nonatomic,readonly)NSInteger replayCount;@property(nonatomic,readonly)NSInteger melodyIndex;@property(nonatomic)BOOL showHUD;
+-(void)Initialize;-(void)Quit;-(void)Update;-(void)Render;-(void)SetMode:(NSInteger)mode;-(void)SetModeNoFade:(NSInteger)mode;-(void)InitMode;-(void)UpdateMode;-(void)RenderMode;-(void)QuitMode;
+-(void)InitTitle;-(void)UpdateTitle;-(void)RenderTitle;-(void)QuitTitle;-(void)InitGame;-(void)UpdateGame;-(void)RenderGame;-(void)QuitGame;-(void)InitMenu;-(void)UpdateMenu;-(void)RenderMenu;-(void)QuitMenu;-(void)InitTutorial;-(void)UpdateTutorial;-(void)RenderTutorial;-(void)QuitTutorial;-(void)InitSetting;-(void)UpdateSetting;-(void)RenderSetting;-(void)QuitSetting;-(void)InitFileList;-(void)UpdateFileList;-(void)RenderFileList;-(void)QuitFileList;-(void)InitFileList2;-(void)UpdateFileList2;-(void)RenderFileList2;-(void)QuitFileList2;-(void)InitReplay;-(void)UpdateReplay;-(void)RenderReplay;-(void)QuitReplay;-(void)InitMelody;-(void)UpdateMelody;-(void)RenderMelody;-(void)QuitMelody;-(void)InitDebug;-(void)UpdateDebug;-(void)RenderDebug;-(void)QuitDebug;
+-(void)SaveParam;-(void)LoadParam;-(void)PreloadPreset;-(void)ChangeSkin;-(void)UpdateSkin;-(void)DeleteSkin;-(void)ShowHUD;-(void)RequestHUD;-(void)Replay:(NSInteger)index;-(void)ReplayPreset:(NSInteger)index;-(void)DeleteReplay:(NSInteger)index;-(BOOL)ReplayDataSkinCheck;
+-(void)userInputPitch:(float)pitch mouth:(float)mouth active:(BOOL)active;-(void)userDidInteract;-(void)startRecording;-(OtamaReplay*)stopRecording;-(BOOL)saveRecording:(OtamaReplay*)replay name:(NSString*)name error:(NSError**)error;-(NSArray<OtamaReplay*>*)availableUserReplays;-(void)playReplayObject:(OtamaReplay*)replay;-(void)stopReplay;-(void)setMelodyIndexNative:(NSInteger)index;-(void)stopMelodyNative;
+@end
