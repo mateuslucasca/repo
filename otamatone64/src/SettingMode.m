@@ -1,3 +1,4 @@
+#import <Foundation/Foundation.h>
 #import "OtamatoneCore.h"
 #include <math.h>
 static OtamaSettings gSettings;
