@@ -1,0 +1,280 @@
+name: touchHLE Otamatone Windows build
+
+on:
+  push:
+    branches: [ "chatgpt/touchhle-otamatone-build" ]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-win:
+    runs-on: windows-2022
+    steps:
+      - name: Clone touchHLE
+        shell: bash
+        run: |
+          git clone https://github.com/touchHLE/touchHLE touchhle
+          cd touchhle
+          git checkout 331903de883405a8597036e4ed5ce8333f1604c9
+          git submodule update --init
+
+      - name: Apply Otamatone compatibility patch
+        shell: bash
+        run: |
+          cd touchhle
+          cat > src/frameworks/foundation/ns_calendar.rs <<'EOF'
+          /*
+           * This Source Code Form is subject to the terms of the Mozilla Public
+           * License, v. 2.0. If a copy of the MPL was not distributed with this
+           * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+           */
+          //! Minimal NSCalendar/NSDateComponents support for legacy iPhone OS apps.
+
+          use super::{ns_string, NSInteger, NSTimeInterval, NSUInteger};
+          use crate::dyld::{ConstantExports, HostConstant};
+          use crate::frameworks::core_foundation::time::CFAbsoluteTimeGetGregorianDate;
+          use crate::objc::{autorelease, id, msg, nil, objc_classes, ClassExports, HostObject, NSZonePtr};
+
+          const NS_GREGORIAN_CALENDAR: &str = "gregorian";
+          type NSCalendarUnit = NSUInteger;
+
+          #[derive(Default)]
+          struct NSCalendarHostObject;
+          impl HostObject for NSCalendarHostObject {}
+
+          #[derive(Default)]
+          struct NSDateComponentsHostObject {
+              year: NSInteger,
+              month: NSInteger,
+              day: NSInteger,
+              hour: NSInteger,
+              minute: NSInteger,
+              second: NSInteger,
+          }
+          impl HostObject for NSDateComponentsHostObject {}
+
+          pub const CLASSES: ClassExports = objc_classes! {
+
+          (env, this, _cmd);
+
+          @implementation NSCalendar: NSObject
+
+          + (id)allocWithZone:(NSZonePtr)_zone {
+              env.objc.alloc_object(this, Box::<NSCalendarHostObject>::default(), &mut env.mem)
+          }
+
+          - (id)initWithCalendarIdentifier:(id)identifier {
+              let identifier = ns_string::to_rust_string(env, identifier);
+              if identifier != NS_GREGORIAN_CALENDAR {
+                  log!("Warning: NSCalendar identifier {:?} is not fully supported; treating it as Gregorian", identifier);
+              }
+              this
+          }
+
+          - (id)components:(NSCalendarUnit)_unit_flags fromDate:(id)date {
+              let time_interval: NSTimeInterval = msg![env; date timeIntervalSinceReferenceDate];
+              let gregorian = CFAbsoluteTimeGetGregorianDate(env, time_interval, nil);
+              let class = env.objc.get_known_class("NSDateComponents", &mut env.mem);
+              let components = env.objc.alloc_object(
+                  class,
+                  Box::new(NSDateComponentsHostObject {
+                      year: gregorian.year,
+                      month: gregorian.month.into(),
+                      day: gregorian.day.into(),
+                      hour: gregorian.hours.into(),
+                      minute: gregorian.minutes.into(),
+                      second: gregorian.seconds as NSInteger,
+                  }),
+                  &mut env.mem,
+              );
+              autorelease(env, components)
+          }
+
+          @end
+
+          @implementation NSDateComponents: NSObject
+
+          + (id)allocWithZone:(NSZonePtr)_zone {
+              env.objc.alloc_object(this, Box::<NSDateComponentsHostObject>::default(), &mut env.mem)
+          }
+
+          - (NSInteger)year {
+              env.objc.borrow::<NSDateComponentsHostObject>(this).year
+          }
+          - (NSInteger)month {
+              env.objc.borrow::<NSDateComponentsHostObject>(this).month
+          }
+          - (NSInteger)day {
+              env.objc.borrow::<NSDateComponentsHostObject>(this).day
+          }
+          - (NSInteger)hour {
+              env.objc.borrow::<NSDateComponentsHostObject>(this).hour
+          }
+          - (NSInteger)minute {
+              env.objc.borrow::<NSDateComponentsHostObject>(this).minute
+          }
+          - (NSInteger)second {
+              env.objc.borrow::<NSDateComponentsHostObject>(this).second
+          }
+
+          @end
+
+          };
+
+          pub const CONSTANTS: ConstantExports = &[
+              (
+                  "_NSGregorianCalendar",
+                  HostConstant::NSString(NS_GREGORIAN_CALENDAR),
+              ),
+          ];
+          EOF
+
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              s = p.read_text()
+              if s.count(old) != 1:
+                  raise RuntimeError(f"Expected exactly one match in {path}: {old!r}, got {s.count(old)}")
+              p.write_text(s.replace(old, new, 1))
+
+          replace_once(
+              "src/frameworks/foundation.rs",
+              "pub mod ns_bundle;\n",
+              "pub mod ns_bundle;\npub mod ns_calendar;\n",
+          )
+          replace_once(
+              "src/frameworks/foundation.rs",
+              "        ns_bundle::CLASSES,\n",
+              "        ns_bundle::CLASSES,\n        ns_calendar::CLASSES,\n",
+          )
+          replace_once(
+              "src/frameworks/foundation.rs",
+              "    constant_exports: &[\n        ns_error::CONSTANTS,\n",
+              "    constant_exports: &[\n        ns_calendar::CONSTANTS,\n        ns_error::CONSTANTS,\n",
+          )
+
+          p = Path("src/frameworks/uikit/ui_view/ui_scroll_view.rs")
+          s = p.read_text()
+          s = s.replace(
+              "use crate::frameworks::core_graphics::{CGPoint, CGRect, CGSize};",
+              "use crate::dyld::{ConstantExports, HostConstant};\nuse crate::frameworks::core_graphics::{CGFloat, CGPoint, CGRect, CGSize};",
+              1,
+          )
+          s = s.replace(
+              "type UIScrollViewIndicatorStyle = NSInteger;\n",
+              "type UIScrollViewIndicatorStyle = NSInteger;\ntype UIScrollViewDecelerationRate = CGFloat;\n\nconst DECELERATION_RATE_NORMAL: UIScrollViewDecelerationRate = 0.998;\nconst DECELERATION_RATE_FAST: UIScrollViewDecelerationRate = 0.99;\n",
+              1,
+          )
+          s = s.replace(
+              "    scroll_enabled: bool,\n    content_offset: CGPoint,",
+              "    scroll_enabled: bool,\n    deceleration_rate: UIScrollViewDecelerationRate,\n    content_offset: CGPoint,",
+              1,
+          )
+          s = s.replace(
+              "            scroll_enabled: true,\n            content_offset:",
+              "            scroll_enabled: true,\n            deceleration_rate: DECELERATION_RATE_NORMAL,\n            content_offset:",
+              1,
+          )
+          marker = "- (())setScrollEnabled:(bool)scroll_enabled {\n    env.objc.borrow_mut::<UIScrollViewHostObject>(this).scroll_enabled = scroll_enabled;\n}\n"
+          insertion = marker + "\n- (UIScrollViewDecelerationRate)decelerationRate {\n    env.objc.borrow::<UIScrollViewHostObject>(this).deceleration_rate\n}\n- (())setDecelerationRate:(UIScrollViewDecelerationRate)rate {\n    env.objc.borrow_mut::<UIScrollViewHostObject>(this).deceleration_rate = rate;\n}\n"
+          if s.count(marker) != 1:
+              raise RuntimeError("Could not locate setScrollEnabled")
+          s = s.replace(marker, insertion, 1)
+
+          marker = "- (())setContentOffset:(CGPoint)offset {\n    env.objc.borrow_mut::<UIScrollViewHostObject>(this).content_offset = offset;\n    // Bounds origin should be equals to the content offset\n    let mut bounds: CGRect = msg![env; this bounds];\n    bounds.origin = offset;\n    () = msg![env; this setBounds:bounds];\n    () = msg![env; this setNeedsDisplay];\n}\n"
+          insertion = marker + "\n- (())setContentOffset:(CGPoint)offset animated:(bool)animated {\n    () = msg![env; this setContentOffset:offset];\n    if animated {\n        let delegate: id = msg![env; this delegate];\n        let sel: SEL = env\n            .objc\n            .register_host_selector(\"scrollViewDidEndScrollingAnimation:\".to_string(), &mut env.mem);\n        let responds: bool = msg![env; delegate respondsToSelector:sel];\n        if responds {\n            () = msg![env; delegate scrollViewDidEndScrollingAnimation:this];\n        }\n    }\n}\n"
+          if s.count(marker) != 1:
+              raise RuntimeError("Could not locate setContentOffset")
+          s = s.replace(marker, insertion, 1)
+
+          s += "\n\npub const CONSTANTS: ConstantExports = &[\n    (\n        \"_UIScrollViewDecelerationRateNormal\",\n        HostConstant::Custom(|env| {\n            env.mem\n                .alloc_and_write(DECELERATION_RATE_NORMAL)\n                .cast()\n                .cast_const()\n        }),\n    ),\n    (\n        \"_UIScrollViewDecelerationRateFast\",\n        HostConstant::Custom(|env| {\n            env.mem\n                .alloc_and_write(DECELERATION_RATE_FAST)\n                .cast()\n                .cast_const()\n        }),\n    ),\n];\n"
+          p.write_text(s)
+
+          replace_once(
+              "src/frameworks/uikit.rs",
+              "        ui_device::CONSTANTS,\n",
+              "        ui_device::CONSTANTS,\n        ui_view::ui_scroll_view::CONSTANTS,\n",
+          )
+          PY
+
+          cargo fmt --all -- --check || cargo fmt --all
+          git diff --check
+          git diff
+
+      - name: Cache Boost
+        id: cache-boost
+        uses: actions/cache@v3
+        with:
+          path: touchhle\vendor\boost
+          key: touchhle-boost_1_81_0
+
+      - if: ${{ steps.cache-boost.outputs.cache-hit != 'true' }}
+        name: Download Boost
+        shell: pwsh
+        run: |
+          cd touchhle
+          curl.exe -L -o boost_1_81_0.7z "https://archives.boost.io/release/1.81.0/source/boost_1_81_0.7z"
+
+      - if: ${{ steps.cache-boost.outputs.cache-hit != 'true' }}
+        name: Extract Boost
+        shell: cmd
+        run: |
+          cd touchhle
+          7z -ovendor x boost_1_81_0.7z
+          ren vendor\boost_1_81_0 boost
+
+      - name: Cache CMake
+        id: cache-cmake
+        uses: actions/cache@v3
+        with:
+          path: touchhle\vendor\cmake
+          key: touchhle-cmake_3_31_6_windows
+
+      - if: ${{ steps.cache-cmake.outputs.cache-hit != 'true' }}
+        name: Download CMake
+        shell: pwsh
+        run: |
+          cd touchhle
+          curl.exe -L -O "https://github.com/Kitware/CMake/releases/download/v3.31.6/cmake-3.31.6-windows-x86_64.zip"
+
+      - if: ${{ steps.cache-cmake.outputs.cache-hit != 'true' }}
+        name: Extract CMake
+        shell: cmd
+        run: |
+          cd touchhle
+          7z -ovendor x cmake-3.31.6-windows-x86_64.zip
+          ren vendor\cmake-3.31.6-windows-x86_64 cmake
+
+      - name: Build patched touchHLE
+        shell: pwsh
+        run: |
+          cd touchhle
+          cargo build --release
+        env:
+          CMAKE: ${{ github.workspace }}\touchhle\vendor\cmake\bin\cmake
+
+      - name: Create Windows bundle
+        shell: bash
+        run: |
+          cd touchhle/dev-scripts
+          ./make-windows-bundle.sh ../target/release/touchHLE.exe
+          mv touchHLE_windows_bundle/ ../../touchHLE_windows_bundle/
+
+      - name: Include patch metadata
+        shell: bash
+        run: |
+          cat > touchHLE_windows_bundle/OTAMATONE_PATCH.txt <<'EOF'
+          touchHLE Otamatone compatibility test build
+          Upstream base: 331903de883405a8597036e4ed5ce8333f1604c9
+          Added: NSGregorianCalendar, NSCalendar/NSDateComponents Gregorian components,
+          UIScrollView deceleration-rate constants/properties, setContentOffset:animated:.
+          EOF
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: touchHLE_Windows_x86_64_Otamatone_patch
+          path: touchHLE_windows_bundle/
