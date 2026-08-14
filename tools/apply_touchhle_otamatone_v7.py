@@ -37,4 +37,5 @@ replace_once(
     "    }\n",
 )
 
+# This helper is intentionally kept as a tiny delta over v6 so failures stay attributable.
 print("Applied Otamatone v7 UIButtonContent nil-title compatibility fix")
