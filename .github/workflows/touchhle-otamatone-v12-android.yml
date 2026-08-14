@@ -1,0 +1,135 @@
+name: touchHLE Otamatone v12 Android
+
+on:
+  push:
+    branches: [ "chatgpt/touchhle-otamatone-v12-android" ]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout patch helpers
+        uses: actions/checkout@v4
+
+      - name: Clone exact touchHLE base
+        shell: bash
+        run: |
+          git clone https://github.com/touchHLE/touchHLE touchhle
+          cd touchhle
+          git checkout 331903de883405a8597036e4ed5ce8333f1604c9
+          git submodule update --init
+
+      - name: Apply Otamatone v12 Android compatibility
+        shell: bash
+        run: |
+          python3 tools/apply_touchhle_otamatone_v12_android.py touchhle
+          cd touchhle
+          cargo fmt --all
+          git diff --check
+          git diff --stat
+
+      - name: Cache Boost
+        id: cache-boost
+        uses: actions/cache@v4
+        with:
+          path: touchhle/vendor/boost
+          key: touchhle-android-boost-1.81.0
+
+      - if: ${{ steps.cache-boost.outputs.cache-hit != 'true' }}
+        name: Download Boost
+        shell: bash
+        run: |
+          cd touchhle
+          curl -L -o boost_1_81_0.7z "https://archives.boost.io/release/1.81.0/source/boost_1_81_0.7z"
+          7z -ovendor x boost_1_81_0.7z
+          mv vendor/boost_1_81_0 vendor/boost
+
+      - name: Cache CMake
+        id: cache-cmake
+        uses: actions/cache@v4
+        with:
+          path: touchhle/vendor/cmake
+          key: touchhle-android-cmake-3.31.6-linux
+
+      - if: ${{ steps.cache-cmake.outputs.cache-hit != 'true' }}
+        name: Download CMake
+        shell: bash
+        run: |
+          cd touchhle
+          curl -L -O "https://github.com/Kitware/CMake/releases/download/v3.31.6/cmake-3.31.6-linux-x86_64.tar.gz"
+          tar xzf cmake-3.31.6-linux-x86_64.tar.gz -C vendor
+          mv vendor/cmake-3.31.6-linux-x86_64 vendor/cmake
+
+      - name: Install Android Rust target
+        run: rustup target add aarch64-linux-android
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk@3.5.4 --locked
+
+      - name: Cache Gradle
+        id: cache-gradle
+        uses: actions/cache@v4
+        with:
+          path: gradle
+          key: touchhle-gradle-8.11.1
+
+      - if: ${{ steps.cache-gradle.outputs.cache-hit != 'true' }}
+        name: Download Gradle
+        shell: bash
+        run: |
+          curl -L -o gradle-8.11.1-bin.zip "https://services.gradle.org/distributions/gradle-8.11.1-bin.zip"
+          mkdir -p gradle
+          7z -ogradle x gradle-8.11.1-bin.zip
+
+      - name: Cache Android NDK r25c
+        id: cache-ndk
+        uses: actions/cache@v4
+        with:
+          path: android-ndk
+          key: touchhle-android-ndk-r25c
+
+      - if: ${{ steps.cache-ndk.outputs.cache-hit != 'true' }}
+        name: Download Android NDK r25c
+        shell: bash
+        run: |
+          curl -L -o android-ndk-r25c-linux.zip "https://dl.google.com/android/repository/android-ndk-r25c-linux.zip"
+          mkdir -p android-ndk
+          7z -oandroid-ndk -snld x android-ndk-r25c-linux.zip
+
+      - name: Link Android NDK and SDK
+        shell: bash
+        run: |
+          rm -rf "$ANDROID_SDK_ROOT/ndk/25.2.9519653"
+          mkdir -p "$ANDROID_SDK_ROOT/ndk"
+          ln -s "$GITHUB_WORKSPACE/android-ndk/android-ndk-r25c" "$ANDROID_SDK_ROOT/ndk/25.2.9519653"
+          echo "sdk.dir=$ANDROID_SDK_ROOT" > touchhle/android/local.properties
+
+      - name: Build release APK
+        shell: bash
+        working-directory: touchhle/android
+        env:
+          ANDROID_NDK_ROOT: /usr/local/lib/android/sdk/ndk/25.2.9519653
+          ANDROID_NDK: /usr/local/lib/android/sdk/ndk/25.2.9519653
+          ANDROID_NDK_HOME: /usr/local/lib/android/sdk/ndk/25.2.9519653
+          CMAKE: ${{ github.workspace }}/touchhle/vendor/cmake/bin/cmake
+        run: |
+          ../../gradle/gradle-8.11.1/bin/gradle --no-daemon assembleRelease
+          cp app/build/outputs/apk/release/app-release.apk ../../touchHLE-Otamatone-v12-Android-arm64.apk
+
+      - name: APK checksums and contents
+        shell: bash
+        run: |
+          sha256sum touchHLE-Otamatone-v12-Android-arm64.apk | tee OTAMATONE_V12_ANDROID_SHA256.txt
+          unzip -l touchHLE-Otamatone-v12-Android-arm64.apk | tail -n 30
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: touchHLE_Otamatone_v12_Android_AArch64
+          path: |
+            touchHLE-Otamatone-v12-Android-arm64.apk
+            OTAMATONE_V12_ANDROID_SHA256.txt
