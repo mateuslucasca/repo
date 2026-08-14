@@ -26,7 +26,7 @@ jobs:
       - name: Apply Otamatone v11 comprehensive compatibility
         shell: pwsh
         run: |
-          python tools/apply_touchhle_otamatone_v11_release2.py touchhle
+          python tools/apply_touchhle_otamatone_v11_release3.py touchhle
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cd touchhle
           cargo fmt --all
