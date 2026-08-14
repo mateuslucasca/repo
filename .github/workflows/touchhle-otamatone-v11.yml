@@ -26,7 +26,7 @@ jobs:
       - name: Apply Otamatone v11 comprehensive compatibility
         shell: pwsh
         run: |
-          python tools/apply_touchhle_otamatone_v11_fixed.py touchhle
+          python tools/apply_touchhle_otamatone_v11_final.py touchhle
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cd touchhle
           cargo fmt --all
@@ -106,12 +106,13 @@ jobs:
           cat > touchHLE_windows_bundle/OTAMATONE_V11.txt <<'EOF'
           Otamatone v11 comprehensive compatibility build.
           Based on exact touchHLE commit 331903de883405a8597036e4ed5ce8333f1604c9.
-          Keeps v1-v10 startup fixes, then adds a broad legacy UIKit pass:
-          UIView NIB state, responder-chain nil targets, UIFont/UILabel NIB state,
-          UIButton normal/highlight image states, functional UISegmentedControl,
-          real UISlider NIB values + basic rendering/tracking, UIScrollView drag
-          callbacks/flags, UITextField return action, functional legacy nav/tab
-          controls, and a local-HTML text fallback for UIWebView.
+          Keeps v1-v10 startup fixes, then adds a broad legacy UIKit/CoreAnimation pass:
+          UIView NIB state, real masksToBounds clipping, responder-chain nil targets,
+          UIFont/UILabel NIB state, UIButton normal/highlight image states, functional
+          UISegmentedControl, real UISlider NIB values + basic rendering/tracking,
+          UIScrollView drag callbacks/flags, UITextField return action, functional
+          legacy nav/tab controls, local-HTML UIWebView fallback, and interpolated
+          implicit CGAffineTransform animations.
           EOF
 
       - uses: actions/upload-artifact@v4
