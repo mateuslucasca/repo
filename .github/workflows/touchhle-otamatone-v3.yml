@@ -1,0 +1,114 @@
+name: touchHLE Otamatone v3 targeted diagnostic
+
+on:
+  push:
+    branches: [ "chatgpt/touchhle-otamatone-build" ]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-win:
+    runs-on: windows-2022
+    steps:
+      - name: Checkout patch helper
+        uses: actions/checkout@v4
+
+      - name: Clone touchHLE
+        shell: bash
+        run: |
+          git clone https://github.com/touchHLE/touchHLE touchhle
+          cd touchhle
+          git checkout 331903de883405a8597036e4ed5ce8333f1604c9
+          git submodule update --init
+
+      - name: Apply Otamatone v3 compatibility and targeted tracer
+        shell: pwsh
+        run: |
+          python tools/apply_touchhle_otamatone_v3.py touchhle
+          cd touchhle
+          cargo fmt --all
+          git diff --check
+          git diff --stat
+
+      - name: Cache Boost
+        id: cache-boost
+        uses: actions/cache@v3
+        with:
+          path: touchhle\vendor\boost
+          key: touchhle-boost_1_81_0
+
+      - if: ${{ steps.cache-boost.outputs.cache-hit != 'true' }}
+        name: Download Boost
+        shell: pwsh
+        run: |
+          cd touchhle
+          curl.exe -L -o boost_1_81_0.7z "https://archives.boost.io/release/1.81.0/source/boost_1_81_0.7z"
+
+      - if: ${{ steps.cache-boost.outputs.cache-hit != 'true' }}
+        name: Extract Boost
+        shell: cmd
+        run: |
+          cd touchhle
+          7z -ovendor x boost_1_81_0.7z
+          ren vendor\boost_1_81_0 boost
+
+      - name: Cache CMake
+        id: cache-cmake
+        uses: actions/cache@v3
+        with:
+          path: touchhle\vendor\cmake
+          key: touchhle-cmake_3_31_6_windows
+
+      - if: ${{ steps.cache-cmake.outputs.cache-hit != 'true' }}
+        name: Download CMake
+        shell: pwsh
+        run: |
+          cd touchhle
+          curl.exe -L -O "https://github.com/Kitware/CMake/releases/download/v3.31.6/cmake-3.31.6-windows-x86_64.zip"
+
+      - if: ${{ steps.cache-cmake.outputs.cache-hit != 'true' }}
+        name: Extract CMake
+        shell: cmd
+        run: |
+          cd touchhle
+          7z -ovendor x cmake-3.31.6-windows-x86_64.zip
+          ren vendor\cmake-3.31.6-windows-x86_64 cmake
+
+      - name: Build patched touchHLE
+        shell: pwsh
+        run: |
+          cd touchhle
+          cargo build --release
+        env:
+          CMAKE: ${{ github.workspace }}\touchhle\vendor\cmake\bin\cmake
+
+      - name: Create Windows bundle
+        shell: bash
+        run: |
+          cd touchhle/dev-scripts
+          ./make-windows-bundle.sh ../target/release/touchHLE.exe
+          mv touchHLE_windows_bundle/ ../../touchHLE_windows_bundle/
+
+      - name: Add launcher and notes
+        shell: bash
+        run: |
+          cat > touchHLE_windows_bundle/RUN_OTAMATONE_V3.bat <<'EOF'
+          @echo off
+          set RUST_BACKTRACE=1
+          touchHLE.exe "touchHLE_apps\Otamatone-v1.21-(Clutch-1.3).ipa"
+          pause
+          EOF
+          cat > touchHLE_windows_bundle/OTAMATONE_V3.txt <<'EOF'
+          Otamatone v3 targeted diagnostic build.
+          Keeps the v1/v2 compatibility fixes.
+          Removes the extremely noisy ABI/dyld trace and logs ENTER/EXIT only
+          around guest Objective-C -initWithCoder: implementations, including
+          class name, receiver and guest IMP address.
+          EOF
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: touchHLE_Windows_x86_64_Otamatone_v3
+          path: touchHLE_windows_bundle/
