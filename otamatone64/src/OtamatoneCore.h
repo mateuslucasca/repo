@@ -1,6 +1,4 @@
 #pragma once
-#import <Foundation/Foundation.h>
-#import <CoreGraphics/CoreGraphics.h>
 #include <stdbool.h>
 #ifdef __cplusplus
 extern "C" {
