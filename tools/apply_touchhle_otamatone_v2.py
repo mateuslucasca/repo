@@ -65,26 +65,34 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (id)components:(NSCalendarUnit)unit_flags fromDate:(id)date {
     let time_interval: NSTimeInterval = msg![env; date timeIntervalSinceReferenceDate];
     let gregorian = CFAbsoluteTimeGetGregorianDate(env, time_interval, nil);
+    // CFGregorianDate is #[repr(C, packed)]. Copy fields before passing them to
+    // formatting macros, which would otherwise create unaligned references.
+    let year = gregorian.year;
+    let month: NSInteger = gregorian.month.into();
+    let day: NSInteger = gregorian.day.into();
+    let hour: NSInteger = gregorian.hours.into();
+    let minute: NSInteger = gregorian.minutes.into();
+    let second = gregorian.seconds as NSInteger;
     log!(
         "Otamatone trace: NSCalendar components flags={:#x} => {:04}-{:02}-{:02} {:02}:{:02}:{:02}",
         unit_flags,
-        gregorian.year,
-        gregorian.month,
-        gregorian.day,
-        gregorian.hours,
-        gregorian.minutes,
-        gregorian.seconds as NSInteger,
+        year,
+        month,
+        day,
+        hour,
+        minute,
+        second,
     );
     let class = env.objc.get_known_class("NSDateComponents", &mut env.mem);
     let components = env.objc.alloc_object(
         class,
         Box::new(NSDateComponentsHostObject {
-            year: gregorian.year,
-            month: gregorian.month.into(),
-            day: gregorian.day.into(),
-            hour: gregorian.hours.into(),
-            minute: gregorian.minutes.into(),
-            second: gregorian.seconds as NSInteger,
+            year,
+            month,
+            day,
+            hour,
+            minute,
+            second,
         }),
         &mut env.mem,
     );
