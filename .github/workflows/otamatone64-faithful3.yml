@@ -34,17 +34,9 @@ jobs:
           )
           wc -c "${parts[@]}"
           shasum -a 256 "${parts[@]}"
-          echo '83a33f34b4cf68c17591b3d7c3ebc52327181ee128680ead4a33ff7b8b3f7489  faithful-src/part02a.b64' | shasum -a 256 -c -
-          echo '5636b3b8fc525aaee7044bcd66d9740f9fae69b95403c0d9f7baf354531baa4b  faithful-src/part02b.b64' | shasum -a 256 -c -
-          echo '04ec65bf957354ccc0adc5956b7cfcc921b964deab67c25732b06f4c4e5bebbe  faithful-src/part02c.b64' | shasum -a 256 -c -
-          echo '460e6a6bc68b020567c82bf98c44d84997b87579f792b7c3b3223cf7748a7d93  faithful-src/part02d.b64' | shasum -a 256 -c -
-          echo 'c6e7b2a433e510495a7fe23a79b8fd7aa7fec09801162fe123bbdbd2ea43d9b5  faithful-src/part04a.b64' | shasum -a 256 -c -
-          echo '88ce7b9d7105e61e5a39f5b224c0d9f20289dd4a8a0ebc9564b127c0280222f0  faithful-src/part04b.b64' | shasum -a 256 -c -
-          echo '4d0f662b8d6769f95f240ff8310659f4ed346d74317739339833707d0baf73bb  faithful-src/part04c.b64' | shasum -a 256 -c -
-          echo '5108991015c98d7ce3b023547efdae40c063e1957a2f7a450d5d52d64b8bda31  faithful-src/part04d.b64' | shasum -a 256 -c -
           cat "${parts[@]}" > /tmp/faithful-src.b64
           echo '60bf0421dbb8c5ebdf286d968c9ed53a2afec249a274c664459766052bb36115  /tmp/faithful-src.b64' | shasum -a 256 -c -
-          base64 --decode /tmp/faithful-src.b64 > /tmp/faithful-src.tar.gz
+          base64 -D -i /tmp/faithful-src.b64 -o /tmp/faithful-src.tar.gz
           echo '0cb368a51281429989e49f77551e384dca0f1b9676e367effe477cf99d2ed362  /tmp/faithful-src.tar.gz' | shasum -a 256 -c -
           rm -rf otamatone64/src
           mkdir -p otamatone64/src
