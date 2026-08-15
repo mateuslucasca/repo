@@ -1,0 +1,189 @@
+--- a/LegacyViews.h
++++ b/LegacyViews.h
+@@ -28,13 +28,26 @@
+ -(void)Initialize;-(void)SetCellState:(NSInteger)state;-(void)StopPrevAll;-(void)OpenMusicListEnd;-(void)OpenMusicList;-(void)OpenHowto;-(void)OpenAbout;
+ @end
+ @interface UIMelodyListCellView:UIView
++@property(nonatomic)NSInteger MusicIndex;
++@property(nonatomic,strong)IBOutlet UILabel *labelMusicDesc;
++@property(nonatomic,strong)IBOutlet UILabel *labelMusicTitle;
++@property(nonatomic,strong)IBOutlet UIImageView *viewPlay;
++@property(nonatomic,strong)IBOutlet UIImageView *viewBG;
++@property(nonatomic,strong)IBOutlet UIButton *btnPlay;
++@property(nonatomic,strong)IBOutlet UIButton *btnSelect;
+ -(void)Initialize:(NSInteger)index :(NSString*)title :(NSString*)subtitle;-(void)SetState:(NSInteger)state;-(void)Play;-(void)Stop;-(void)PlayMusic:(id)sender;-(void)SelectMusic:(id)sender;
+ @end
+ @interface UISimpleHtml:UIWebView<UIWebViewDelegate>
+ -(void)SetURL:(NSString*)url;
+ @end
+ @interface UICustomSwitch:UISlider
+-@property(nonatomic,getter=isOn)BOOL on;@property(nonatomic,strong)id ResponseClass;@property(nonatomic,strong)UILabel *leftLabel;@property(nonatomic,strong)UILabel *rightLabel;@property(nonatomic,strong)UIView *clippingView;
+--(void)SetResponseClass:(id)obj;-(void)setOn:(BOOL)on animated:(BOOL)animated;
++@property(nonatomic,getter=isOn)BOOL on;
++@property(nonatomic,strong)id ResponseClass;
++@property(nonatomic,strong)UILabel *leftLabel;
++@property(nonatomic,strong)UILabel *rightLabel;
++@property(nonatomic,strong)UIView *clippingView;
++@property(nonatomic,strong)UIColor *tintColor;
+++(instancetype)switchWithLeftText:(NSString*)left andRight:(NSString*)right;
++-(void)SetResponseClass:(id)obj;-(void)setOn:(BOOL)on animated:(BOOL)animated;-(void)scaleSwitch:(CGFloat)scale;
+ @end
+ void OtamaRegisterLegacyMenuClass(void);
+--- a/LegacyViews.m
++++ b/LegacyViews.m
+@@ -3,6 +3,7 @@
+ #import "MainMode.h"
+ #import "OtamatoneCore.h"
+ #import <objc/runtime.h>
++#import <objc/message.h>
+ 
+ static EAGLView *FindEAGLView(UIResponder *r){while(r&&![r isKindOfClass:NSClassFromString(@"EAGLView")])r=r.nextResponder;return(EAGLView*)r;}
+ static NSString *LangSuffix(void){return [NSLocale.preferredLanguages.firstObject hasPrefix:@"ja"]?@"jp":@"eng";}
+@@ -85,29 +86,107 @@
+ -(void)SetFont:(UIFont*)font{self.MessageLabel.font=font;}
+ @end
+ 
+-#pragma mark - Original-style switch
+-@interface UICustomSwitch()@property(nonatomic,strong)UIImageView*track;@property(nonatomic,strong)UIImageView*thumb;@end
++#pragma mark - UICustomSwitch — reconstructed from the original ARMv7 implementation
++@interface UICustomSwitch()@property(nonatomic)BOOL touchedSelf;@end
+ @implementation UICustomSwitch
+--(instancetype)initWithFrame:(CGRect)f{if((self=[super initWithFrame:f]))[self commonInit];return self;}
+--(void)awakeFromNib{[super awakeFromNib];[self commonInit];}
+--(void)commonInit{
+-    if(self.track)return;self.minimumValue=0;self.maximumValue=1;self.continuous=NO;self.backgroundColor=UIColor.clearColor;
+-    self.track=[[UIImageView alloc]initWithFrame:CGRectMake(0,0,96,29)];self.track.userInteractionEnabled=NO;[self addSubview:self.track];
+-    self.thumb=[[UIImageView alloc]initWithImage:[UIImage imageNamed:@"switchThumb.png"]];self.thumb.frame=CGRectMake(1,1,39,27);self.thumb.userInteractionEnabled=NO;[self addSubview:self.thumb];
+-    [self setMinimumTrackImage:[[UIImage alloc]init] forState:UIControlStateNormal];[self setMaximumTrackImage:[[UIImage alloc]init] forState:UIControlStateNormal];[self setThumbImage:[[UIImage alloc]init] forState:UIControlStateNormal];
+-    [self addTarget:self action:@selector(sliderChanged) forControlEvents:UIControlEventValueChanged];[self updateVisual:NO];
+++(instancetype)switchWithLeftText:(NSString*)left andRight:(NSString*)right{
++    UICustomSwitch *s=[[self alloc] initWithFrame:CGRectZero];
++    s.leftLabel.text=left; s.rightLabel.text=right;
++    return s;
+ }
+--(void)SetResponseClass:(id)obj{self.ResponseClass=obj;}
+--(void)setOn:(BOOL)on{[self setOn:on animated:NO];}
+--(void)setOn:(BOOL)on animated:(BOOL)animated{_on=on;[super setValue:on?1:0 animated:animated];[self updateVisual:animated];if(self.ResponseClass&&[self.ResponseClass respondsToSelector:@selector(ValueChanged)])[self.ResponseClass performSelector:@selector(ValueChanged)];}
+--(void)sliderChanged{BOOL n=self.value>=.5f;if(n!=_on){_on=n;[self updateVisual:YES];if(self.ResponseClass&&[self.ResponseClass respondsToSelector:@selector(ValueChanged)])[self.ResponseClass performSelector:@selector(ValueChanged)];}}
+--(void)updateVisual:(BOOL)a{void(^b)(void)=^{self.track.image=[UIImage imageNamed:self.on?@"switchBlueBg.png":@"switchOffPlain.png"];CGRect f=self.thumb.frame;f.origin.x=self.on?57:1;self.thumb.frame=f;self.leftLabel.alpha=self.on?1:.38;self.rightLabel.alpha=self.on?.38:1;};if(a)[UIView animateWithDuration:.2 animations:b];else b();}
+--(void)layoutSubviews{[super layoutSubviews];self.track.frame=CGRectMake(0,0,96,29);CGRect f=self.thumb.frame;f.origin.y=1;f.origin.x=self.on?57:1;self.thumb.frame=f;}
++-(instancetype)initWithFrame:(CGRect)frame{ if((self=[super initWithFrame:frame])){ self.ResponseClass=nil; [self awakeFromNib]; } return self; }
++-(void)awakeFromNib{
++    [super awakeFromNib];
++    self.backgroundColor=UIColor.clearColor;
++    [self setThumbImage:[UIImage imageNamed:@"switchThumb.png"] forState:UIControlStateNormal];
++    [self setMinimumTrackImage:[UIImage imageNamed:@"switchBlueBg.png"] forState:UIControlStateNormal];
++    [self setMaximumTrackImage:[UIImage imageNamed:@"switchOffPlain.png"] forState:UIControlStateNormal];
++    self.minimumValue=0.0f; self.maximumValue=1.0f; self.continuous=NO;
++    _on=NO; [super setValue:0.0f animated:NO];
++    if(!self.clippingView){
++        self.clippingView=[[UIView alloc] initWithFrame:CGRectMake(4,2,87,23)];
++        self.clippingView.clipsToBounds=YES;
++        self.clippingView.userInteractionEnabled=NO;
++        self.userInteractionEnabled=YES;
++        [self addSubview:self.clippingView];
++    }
++    if(!self.leftLabel){
++        self.leftLabel=[[UILabel alloc] initWithFrame:CGRectMake(0,0,48,17)];
++        self.leftLabel.backgroundColor=UIColor.clearColor;
++        self.leftLabel.textAlignment=NSTextAlignmentCenter;
++        self.leftLabel.font=[UIFont boldSystemFontOfSize:12.0f];
++        self.leftLabel.textColor=UIColor.whiteColor;
++        self.leftLabel.shadowColor=UIColor.darkGrayColor;
++        self.leftLabel.text=@"I";
++        [self.clippingView addSubview:self.leftLabel];
++    }
++    if(!self.rightLabel){
++        self.rightLabel=[[UILabel alloc] initWithFrame:CGRectMake(0,0,48,17)];
++        self.rightLabel.backgroundColor=UIColor.clearColor;
++        self.rightLabel.textAlignment=NSTextAlignmentCenter;
++        self.rightLabel.font=[UIFont boldSystemFontOfSize:12.0f];
++        self.rightLabel.textColor=UIColor.grayColor;
++        self.rightLabel.shadowColor=UIColor.whiteColor;
++        self.rightLabel.text=@"O";
++        [self.clippingView addSubview:self.rightLabel];
++    }
++    [self setNeedsLayout];
++}
++-(BOOL)isOn{return _on;}
++-(void)setOn:(BOOL)on{[self setOn:on animated:NO];}
++-(void)setOn:(BOOL)on animated:(BOOL)animated{
++    _on=on;
++    if(animated){
++        [UIView beginAnimations:nil context:nil];
++        [UIView setAnimationDuration:0.2];
++        [super setValue:on?1.0f:0.0f animated:NO];
++        [self layoutIfNeeded];
++        [UIView commitAnimations];
++    }else{
++        [super setValue:on?1.0f:0.0f animated:NO];
++        [self setNeedsLayout]; [self layoutIfNeeded];
++    }
++    if(self.ResponseClass && [self.ResponseClass respondsToSelector:@selector(ValueChanged)])
++        [self.ResponseClass performSelector:@selector(ValueChanged)];
++}
++-(void)SetResponseClass:(id)obj{self.ResponseClass=obj;}
++-(void)scaleSwitch:(CGFloat)scale{self.transform=CGAffineTransformMakeScale(scale,scale);}
++-(void)touchesBegan:(NSSet<UITouch*>*)touches withEvent:(UIEvent*)event{
++    [super touchesBegan:touches withEvent:event];
++    self.touchedSelf=NO;
++    _on=!_on;
++}
++-(void)touchesEnded:(NSSet<UITouch*>*)touches withEvent:(UIEvent*)event{
++    [super touchesEnded:touches withEvent:event];
++    if(!self.touchedSelf)[self setOn:_on animated:YES];
++    [self sendActionsForControlEvents:UIControlEventValueChanged];
++}
++-(BOOL)endTrackingWithTouch:(UITouch*)touch withEvent:(UIEvent*)event{
++    BOOL r=[super endTrackingWithTouch:touch withEvent:event];
++    self.touchedSelf=YES;
++    [self setOn:_on animated:YES];
++    return r;
++}
++-(void)layoutSubviews{
++    [super layoutSubviews];
++    [self.clippingView removeFromSuperview];
++    [self insertSubview:self.clippingView belowSubview:self.subviews.lastObject];
++    CGSize thumb=self.currentThumbImage.size;
++    CGRect track=self.bounds;
++    CGFloat travel=MAX(0.0, track.size.width-thumb.width);
++    CGFloat x=travel*self.value;
++    self.leftLabel.frame=CGRectMake(x-travel+2,3,48,17);
++    self.rightLabel.frame=CGRectMake(x+thumb.width-2,3,48,17);
++}
+ @end
+ 
+-static UICustomSwitch *AddLegacySwitch(UIView *host,CGFloat y,id target,BOOL on){UICustomSwitch*s=[[UICustomSwitch alloc]initWithFrame:CGRectMake(205,y,96,29)];s.leftLabel=[[UILabel alloc]initWithFrame:CGRectMake(5,6,36,17)];s.rightLabel=[[UILabel alloc]initWithFrame:CGRectMake(55,6,36,17)];for(UILabel*l in @[s.leftLabel,s.rightLabel]){l.font=[UIFont boldSystemFontOfSize:12];l.textColor=UIColor.whiteColor;l.backgroundColor=UIColor.clearColor;l.textAlignment=NSTextAlignmentCenter;[s addSubview:l];}s.leftLabel.text=@"I";s.rightLabel.text=@"O";s.ResponseClass=target;[s setOn:on];[host addSubview:s];return s;}
++static UICustomSwitch *AddLegacySwitch(UIView *host,CGRect frame,id target,BOOL on){
++    UICustomSwitch*s=[[UICustomSwitch alloc]initWithFrame:frame];s.ResponseClass=target;[s setOn:on];[host addSubview:s];return s;
++}
+@@ -119,7 +198,7 @@
+ @implementation SettingView
+ -(void)awakeFromNib{[super awakeFromNib];[self SetContentSize];self.hidden=YES;self.alpha=0;}
+--(void)SetContentSize{self.ScrollView.contentSize=CGSizeMake(320,525);self.ScrollView.showsHorizontalScrollIndicator=NO;if(self.SettingContentView&&!self.followSwitch){self.followSwitch=AddLegacySwitch(self.SettingContentView,220.5,self,SettingIsFollow());self.fukidashiSwitch=AddLegacySwitch(self.SettingContentView,302.5,self,!SettingState()->hideFukidashi);}}
++-(void)SetContentSize{self.ScrollView.contentSize=CGSizeMake(320,525);self.ScrollView.showsHorizontalScrollIndicator=NO;if(self.SettingContentView&&!self.followSwitch){self.followSwitch=AddLegacySwitch(self.SettingContentView,CGRectMake(78,207,91,27),self,SettingIsFollow());self.fukidashiSwitch=AddLegacySwitch(self.SettingContentView,CGRectMake(78,290,91,27),self,!SettingState()->hideFukidashi);}}
+@@ -137,7 +216,7 @@
+ -(void)SetContentSize{
+     self.ScrollView.contentSize=CGSizeMake(320,520);self.ScrollView.showsHorizontalScrollIndicator=NO;self.SkinScroll.contentSize=CGSizeMake(5*90,78);self.SkinScroll.delegate=self;
+--    if(!self.followSwitch){self.followSwitch=AddLegacySwitch(self.ScrollView,138,self,SettingIsFollow());self.fukidashiSwitch=AddLegacySwitch(self.ScrollView,218,self,!SettingState()->hideFukidashi);self.recordSwitch=AddLegacySwitch(self.ScrollView,298,self,SettingState()->recordHoldMode);
++    if(!self.followSwitch){self.followSwitch=AddLegacySwitch(self.ScrollView,CGRectMake(78,204,91,27),self,SettingIsFollow());self.fukidashiSwitch=AddLegacySwitch(self.ScrollView,CGRectMake(78,286,91,27),self,!SettingState()->hideFukidashi);self.recordSwitch=AddLegacySwitch(self.ScrollView,CGRectMake(78,365,91,27),self,SettingState()->recordHoldMode);
+@@ -153,36 +232,59 @@
+ @end
+ 
+-#pragma mark - Melody list
++#pragma mark - Melody list — reconstructed from UIMelodyListView/UIMelodyListCellView
+ @interface UIMelodyListView()@property(nonatomic,strong)NSMutableArray<UIMelodyListCellView*>*cells;@property(nonatomic)BOOL melodyVariant;@end
+ @implementation UIMelodyListView
+@@ -191,6 +293,6 @@
+ @end
+--- a/OtamaAudio.m
++++ b/OtamaAudio.m
+@@ -6,7 +6,7 @@
+ -(BOOL)start:(NSError**)error{if(self.engine.running)return YES;AVAudioSession*s=AVAudioSession.sharedInstance;[s setCategory:AVAudioSessionCategoryPlayback mode:AVAudioSessionModeDefault options:AVAudioSessionCategoryOptionMixWithOthers error:nil];[s setActive:YES error:nil];self.engine=[AVAudioEngine new];self.nodes=[NSMutableArray array];self.rates=[NSMutableArray array];self.buffers=[NSMutableArray array];for(NSString*n in @[@"open_low",@"close_low",@"open_mid",@"close_mid",@"open_high",@"close_high"]){AVAudioPCMBuffer*b=[self bufferFor:n error:error];if(!b)return NO;AVAudioPlayerNode*node=[AVAudioPlayerNode new];AVAudioUnitVarispeed*rate=[AVAudioUnitVarispeed new];[self.engine attachNode:node];[self.engine attachNode:rate];[self.engine connect:node to:rate format:b.format];[self.engine connect:rate to:self.engine.mainMixerNode format:nil];node.volume=0;rate.rate=1;[node scheduleBuffer:b atTime:nil options:AVAudioPlayerNodeBufferLoops completionHandler:nil];[self.nodes addObject:node];[self.rates addObject:rate];[self.buffers addObject:b];}if(![self.engine startAndReturnError:error])return NO;for(AVAudioPlayerNode*n in self.nodes)[n play];return YES;}
+ -(void)stop{for(AVAudioPlayerNode*n in self.nodes)n.volume=0;[self.engine stop];self.instrumentActive=NO;}
+ -(void)setPitch:(float)pitch mouth:(float)mouth active:(BOOL)active{mouth=fmaxf(0,fminf(1,mouth));pitch=fmaxf(.125f,fminf(8,pitch));int bank=MAX(0,MIN(2,self.octave));for(int i=0;i<3;i++){int oi=i*2,ci=oi+1;float v=(active&&i==bank)?self.masterVolume:0;self.nodes[oi].volume=v*mouth;self.nodes[ci].volume=v*(1-mouth);self.rates[oi].rate=pitch;self.rates[ci].rate=pitch;}self.instrumentActive=active;}
+--(void)playMelodyIndex:(NSInteger)i{NSArray*n=@[@"s1_kae",@"s2_gre",@"s3_ein",@"s4_ook",@"s5_kir",@"s6_shi",@"s7_fur",@"s8_bri",@"s9_kiy",@"s10_sym",@"s11_hot4"];if(i<0||i>=n.count)return;NSURL*u=[[NSBundle mainBundle]URLForResource:n[i] withExtension:@"wav"];if(!u)return;self.melodyPlayer=[[AVAudioPlayer alloc]initWithContentsOfURL:u error:nil];self.melodyPlayer.volume=.85;[self.melodyPlayer prepareToPlay];[self.melodyPlayer play];}
++-(void)playMelodyIndex:(NSInteger)i{NSArray*n=@[@"s1_kae",@"s2_gre",@"s3_ein",@"s4_ook",@"s5_kir",@"s6_shi",@"s7_fur",@"s8_bri",@"s9_kiy",@"s10_sym",@"s11_hot4"];if(i<0||i>=n.count)return;NSURL*u=[[NSBundle mainBundle]URLForResource:n[i] withExtension:@"wav"];if(!u)return;self.melodyPlayer=[[AVAudioPlayer alloc]initWithContentsOfURL:u error:nil];self.melodyPlayer.volume=self.masterVolume;[self.melodyPlayer prepareToPlay];[self.melodyPlayer play];}
+ -(void)stopMelody{[self.melodyPlayer stop];self.melodyPlayer=nil;}
+ -(void)playUISoundNamed:(NSString*)name{NSURL*u=[[NSBundle mainBundle]URLForResource:name withExtension:@"wav"];if(!u)return;self.uiPlayer=[[AVAudioPlayer alloc]initWithContentsOfURL:u error:nil];[self.uiPlayer play];}
+ @end
