@@ -53,6 +53,19 @@ jobs:
           base64 -D -i /tmp/original-controls.b64 -o /tmp/original-controls.tar.gz
           echo '6662ef76b89af7ce7c10d95693e89e074f883453742150c7a60594984a3209bc  /tmp/original-controls.tar.gz' | shasum -a 256 -c -
           tar -xzf /tmp/original-controls.tar.gz -C otamatone64/src
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('otamatone64/src/LegacyViews.m')
+          s=p.read_text()
+          s=s.replace('@implementation UICustomSwitch\n', '@implementation UICustomSwitch\n@synthesize on=_on;\n', 1)
+          old='''-(BOOL)endTrackingWithTouch:(UITouch*)touch withEvent:(UIEvent*)event{\n    BOOL r=[super endTrackingWithTouch:touch withEvent:event];\n    self.touchedSelf=YES;\n    [self setOn:_on animated:YES];\n    return r;\n}'''
+          new='''-(void)endTrackingWithTouch:(UITouch*)touch withEvent:(UIEvent*)event{\n    [super endTrackingWithTouch:touch withEvent:event];\n    self.touchedSelf=YES;\n    [self setOn:_on animated:YES];\n}'''
+          if old not in s:
+              raise SystemExit('old endTracking implementation not found')
+          s=s.replace(old,new,1)
+          p.write_text(s)
+          PY
+          grep -Fq '@synthesize on=_on;' otamatone64/src/LegacyViews.m
           grep -Fq 'CGRectMake(4,2,87,23)' otamatone64/src/LegacyViews.m
           grep -Fq 'CGRectMake(78,207,91,27)' otamatone64/src/LegacyViews.m
           grep -Fq 'CGRectMake(78,365,91,27)' otamatone64/src/LegacyViews.m
