@@ -18,6 +18,14 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
+          wc -c faithful-src/part*.b64
+          shasum -a 256 faithful-src/part*.b64
+          echo '65853fc23be0a32eb63bdf81370530d27f3b0944b7735b2139372d2fd1b47557  faithful-src/part00.b64' | shasum -a 256 -c -
+          echo '5f26c2b231e9ebdbf2dbe89c520f0033fc7edd5f886f15936c33c84913f475d2  faithful-src/part01.b64' | shasum -a 256 -c -
+          echo '616877cfd6c8a3e6577a94bc71bcf550f7afda95efd7e080326000d40e2b74e2  faithful-src/part02.b64' | shasum -a 256 -c -
+          echo '8c07e801e38c08db4c2cd9dd1a4db85cea58790627d1f19f82e1cc78e2661618  faithful-src/part03.b64' | shasum -a 256 -c -
+          echo '90220c50644a934be08b75e445740a44869d9a884bfbb80c389daf7c340340b2  faithful-src/part04.b64' | shasum -a 256 -c -
+          echo 'dc9408290e7aa0afc213c6533ac115317707ac9bb00f65a350a3d1607cb199ac  faithful-src/part05.b64' | shasum -a 256 -c -
           cat faithful-src/part*.b64 > /tmp/faithful-src.b64
           echo '60bf0421dbb8c5ebdf286d968c9ed53a2afec249a274c664459766052bb36115  /tmp/faithful-src.b64' | shasum -a 256 -c -
           base64 --decode /tmp/faithful-src.b64 > /tmp/faithful-src.tar.gz
