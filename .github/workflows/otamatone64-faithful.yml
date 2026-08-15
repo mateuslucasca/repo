@@ -1,0 +1,66 @@
+name: Otamatone64 faithful native ARM64
+
+on:
+  push:
+    branches: [ "chatgpt/otamatone64-faithful2" ]
+  workflow_dispatch:
+
+env:
+  DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
+
+jobs:
+  build-ios-arm64:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore faithful source snapshot
+        shell: bash
+        run: |
+          set -euxo pipefail
+          rm -rf otamatone64/src
+          mkdir -p otamatone64/src
+          tar -xzf otamatone64-faithful-src.tar.gz -C otamatone64/src
+          grep -q 'UIApplicationMain(argc,argv,nil,nil)' otamatone64/src/main.m
+          ! grep -q 'UIAlertController' otamatone64/src/EAGLView.m
+      - name: Build faithful native Otamatone64
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p otamatone64/build
+          SDK="$(xcrun --sdk iphoneos --show-sdk-path)"
+          xcrun --sdk iphoneos clang \
+            -arch arm64 \
+            -isysroot "$SDK" \
+            -miphoneos-version-min=12.0 \
+            -fobjc-arc -fblocks -O2 -g0 \
+            -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-declarations \
+            otamatone64/src/*.m otamatone64/src/*.c \
+            -framework Foundation \
+            -framework UIKit \
+            -framework CoreGraphics \
+            -framework AVFoundation \
+            -framework CoreMotion \
+            -framework WebKit \
+            -framework QuartzCore \
+            -o otamatone64/build/Otamatone64
+          codesign --force --sign - --timestamp=none otamatone64/build/Otamatone64
+      - name: Verify native Mach-O and archived UI hooks
+        shell: bash
+        run: |
+          set -euxo pipefail
+          file otamatone64/build/Otamatone64
+          lipo -info otamatone64/build/Otamatone64
+          otool -l otamatone64/build/Otamatone64 | grep -A8 -E 'LC_BUILD_VERSION|LC_VERSION_MIN_IPHONEOS' || true
+          strings otamatone64/build/Otamatone64 | grep -E 'GameProjectAppDelegate|EAGLView|UINameEntryView|UIHtmlView|AlertView|SettingView|UISettingView|UIMelodyListView|UISimpleHtml|UICustomSwitch' | sort -u
+          shasum -a 256 otamatone64/build/Otamatone64 | tee otamatone64/build/SHA256.txt
+      - name: Add faithful source snapshot
+        run: |
+          cp -R otamatone64/src otamatone64/build/source
+          printf '%s\n' \
+            'ARM64 native reconstruction using the original MainWindow.nib as the UI source of truth.' \
+            'The public artifact intentionally excludes the proprietary original NIB/assets.' \
+            > otamatone64/build/README.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Otamatone64-faithful-arm64
+          path: otamatone64/build/
